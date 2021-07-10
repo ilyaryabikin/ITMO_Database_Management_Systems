@@ -4,7 +4,7 @@ CREATE OR REPLACE PROCEDURE
     l_tables_count  NUMBER;
     l_columns_count VARCHAR2(2048);
     l_indexes_count VARCHAR2(2048);
-    l_is_keyword    NUMBER;
+    l_not_keyword   NUMBER;
     l_is_exists     NUMBER;
     l_is_permitted  NUMBER;
     l_t_name_pad    NUMBER := 30;
@@ -20,50 +20,44 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20000, 'Название схемы не должно быть пустой строкой');
     END IF;
 
-    IF NOT REGEXP_LIKE(schema_name_in, '^[a-zA-Z_$#]+$') THEN
+    IF NOT REGEXP_LIKE(schema_name_in, '^[0-9a-zA-Z_$#]{1,30}$') THEN
         RAISE_APPLICATION_ERROR(-20000, 'Название схемы не валидно');
     END IF;
 
     BEGIN
-        SELECT 1 INTO l_is_keyword FROM V$RESERVED_WORDS WHERE schema_name_in = KEYWORD;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
+        SELECT COUNT(*) INTO l_not_keyword FROM V$RESERVED_WORDS WHERE UPPER(schema_name_in) = UPPER(KEYWORD);
+        IF l_not_keyword <> 0 THEN
             RAISE_APPLICATION_ERROR(-20001, 'Название схемы не может быть зарезервированным словом базы данных');
+        END IF;
     END;
-
-    /*IF l_is_keyword = 1 THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Название схемы не может быть зарезервированным словом базы данных');
-    END IF;*/
 
     BEGIN
-        SELECT 1 INTO l_is_exists FROM SYS.ALL_USERS WHERE UPPER(USERNAME) = UPPER(schema_name_in);
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20002, 'Введенная схема не существует');
+        SELECT COUNT(*) INTO l_is_exists FROM DBA_USERS WHERE UPPER(USERNAME) = UPPER(schema_name_in);
+        IF l_is_exists = 0 THEN
+            RAISE_APPLICATION_ERROR(-20002, 'Введенная схема не существует');
+        END IF;
     END;
-
-    /*IF l_is_exists != 1 THEN
-        RAISE_APPLICATION_ERROR(-20002, 'Введенная схема не существует');
-    END IF;*/
 
     BEGIN
-        SELECT 1 INTO l_is_permitted FROM ALL_TABLES WHERE UPPER(OWNER) = UPPER(schema_name_in);
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20002, 'Введенная схема не существует');
+        SELECT COUNT(*)
+        INTO l_is_permitted
+        FROM ALL_OBJECTS
+        WHERE UPPER(OWNER) = UPPER(schema_name_in);
+        IF l_is_permitted = 0 THEN
+            RAISE_APPLICATION_ERROR(-20003, 'Вы не имеете доступа к введенной схеме');
+        END IF;
     END;
-
-
-    /*IF l_is_permitted != 1 THEN
-        RAISE_APPLICATION_ERROR(-20003, 'Вы не имеете доступа к введенной схеме');
-    END IF;*/
 
     SELECT COUNT(TABLE_NAME)
     INTO l_tables_count
     FROM ALL_TABLES
     WHERE UPPER(OWNER) = UPPER(schema_name_in);
+
     SELECT COUNT(COLUMN_NAME)
     INTO l_columns_count
     FROM ALL_TAB_COLUMNS
     WHERE UPPER(OWNER) = UPPER(schema_name_in);
+
     SELECT COUNT(INDEX_NAME)
     INTO l_indexes_count
     FROM ALL_INDEXES
@@ -97,4 +91,13 @@ BEGIN
             DBMS_OUTPUT.PUT_LINE('');
         END LOOP;
     DBMS_OUTPUT.PUT_LINE('-----------------------------------------------');
-END;
+END inspect_schema;
+/
+
+SET SERVEROUTPUT ON FORMAT WRAPPED;
+SET VERIFY OFF;
+ACCEPT schema_name CHAR PROMPT "Введите название схемы: "
+BEGIN
+    inspect_schema('&schema_name');
+end;
+/
