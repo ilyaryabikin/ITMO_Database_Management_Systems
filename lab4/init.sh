@@ -165,7 +165,7 @@ mkfile -n 500M /u01/richlion/richlion0
 mkfile -n 500M /u01/richlion/richlion1
 mkfile -n 500M /u01/richlion/richlion2
 mkfile -n 500M /u01/richlion/richlion3
-create diskgroup richlion normal redundancy disk
+create diskgroup richlion external redundancy disk
 '/u01/richlion/richlion0' name richlion0,
 '/u01/richlion/richlion1' name richlion1,
 '/u01/richlion/richlion2' name richlion2,
